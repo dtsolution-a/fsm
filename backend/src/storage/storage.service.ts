@@ -5,7 +5,7 @@ import * as path from 'path';
 import { Readable } from 'stream';
 
 // File storage. Production -> S3 (S3_BUCKET). Development -> local folder (UPLOAD_DIR, default ./uploads).
-// Containers have throw-away disks, so local storage is refused in production.
+// Containers have throw-away disks, so local storage is refused in production unless ALLOW_LOCAL_STORAGE=true (persistent volume).
 @Injectable()
 export class StorageService {
   private bucket = process.env.S3_BUCKET;
@@ -13,7 +13,8 @@ export class StorageService {
   private dir = path.resolve(process.env.UPLOAD_DIR || './uploads');
 
   private assertAvailable() {
-    if (!this.s3 && process.env.NODE_ENV === 'production') {
+    // ALLOW_LOCAL_STORAGE=true is for a single server whose UPLOAD_DIR is a persistent Docker volume (docker-compose.yml).
+    if (!this.s3 && process.env.NODE_ENV === 'production' && process.env.ALLOW_LOCAL_STORAGE !== 'true') {
       throw new ServiceUnavailableException('File storage is not configured (S3_BUCKET is not set)');
     }
   }

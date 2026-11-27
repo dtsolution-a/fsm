@@ -55,7 +55,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       ProfileScreen(session: widget.session),
     ];
     return Scaffold(
-      appBar: AppBar(
+      appBar: _index == 0 ? null : AppBar(
         toolbarHeight: 60,
         flexibleSpace: Container(decoration: const BoxDecoration(gradient: AppColors.hero, borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)))),
         title: Row(children: [

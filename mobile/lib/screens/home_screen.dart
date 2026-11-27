@@ -171,6 +171,12 @@ class _BodyState extends State<_Body> {
           padding: const EdgeInsets.fromLTRB(22, 6, 22, 30),
           child: FadeIn(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(padding: const EdgeInsets.all(2), decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle), child: ClipOval(child: Image.asset('assets/brand/shah-mark.png', width: 34, height: 34))),
+                const SizedBox(width: 10),
+                const Text('कार्यसेतु', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Colors.white)),
+              ]),
+              const SizedBox(height: 18),
               Text(today, style: const TextStyle(fontSize: 13, color: Color(0xB3FFFFFF), fontWeight: FontWeight.w500)),
               const SizedBox(height: 2),
               Text(tr('hello', {'name': widget.userName.split(' ').first}), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: -0.4)),

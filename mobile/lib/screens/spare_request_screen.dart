@@ -66,7 +66,7 @@ class _SpareRequestScreenState extends State<SpareRequestScreen> {
                 for (final p in _found)
                   Card(child: ListTile(
                     title: Text(p['name'] as String, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)), subtitle: Text(p['partNumber'] as String),
-                    trailing: FilledButton(onPressed: () => setState(() { _picked.putIfAbsent(p['id'] as String, () => {'part': p, 'qty': 1}); _found = []; _search.clear(); }), child: Text(tr('spare_add'))),
+                    trailing: FilledButton(style: FilledButton.styleFrom(minimumSize: const Size(84, 44)), onPressed: () => setState(() { _picked.putIfAbsent(p['id'] as String, () => {'part': p, 'qty': 1}); _found = []; _search.clear(); }), child: Text(tr('spare_add'))),
                   )),
                 if (_picked.isNotEmpty) ...[
                   const SizedBox(height: 14),

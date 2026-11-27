@@ -62,7 +62,22 @@ class ProfileScreen extends StatelessWidget {
               valueListenable: AppLang.current,
               builder: (context, lang, _) => Wrap(spacing: 8, runSpacing: 8, children: [
                 for (final e in AppLang.options.entries)
-                  ChoiceChip(label: Text(e.value, style: const TextStyle(fontSize: 16)), selected: lang == e.key, onSelected: (_) => AppLang.set(e.key), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () => AppLang.set(e.key),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: lang == e.key ? AppColors.primary : const Color(0xFFF1F4FB),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: lang == e.key ? AppColors.primary : AppColors.border),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        if (lang == e.key) const Padding(padding: EdgeInsets.only(right: 6), child: Icon(Icons.check, size: 18, color: Colors.white)),
+                        Text(e.value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: lang == e.key ? Colors.white : AppColors.text)),
+                      ]),
+                    ),
+                  ),
               ]),
             )),
             const SizedBox(height: 12),

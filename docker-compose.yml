@@ -36,6 +36,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (32+ random chars) in .env}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
       RUN_MIGRATIONS: "true"
+      ALLOW_LOCAL_STORAGE: "true"   # single server: photos live in the persistent uploads volume (no S3)
     volumes:
       - uploads:/data/uploads   # photos and signatures survive rebuilds
 

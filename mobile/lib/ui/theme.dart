@@ -154,7 +154,7 @@ ThemeData buildTheme() {
       ),
     ),
     textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: AppColors.primary, minimumSize: const Size(0, 38), tapTargetSize: MaterialTapTargetSize.shrinkWrap, textStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 14, fontWeight: FontWeight.w600))),
-    chipTheme: ChipThemeData(shape: const StadiumBorder(), side: const BorderSide(color: AppColors.border), selectedColor: AppColors.primarySoft, backgroundColor: Colors.white, labelStyle: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+    chipTheme: ChipThemeData(shape: const StadiumBorder(), side: const BorderSide(color: AppColors.border), selectedColor: AppColors.primarySoft, backgroundColor: Colors.white, labelStyle: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, color: AppColors.text)),
     snackBarTheme: SnackBarThemeData(behavior: SnackBarBehavior.floating, backgroundColor: AppColors.text, contentTextStyle: const TextStyle(fontFamily: 'Poppins', color: Colors.white), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
     dialogTheme: DialogThemeData(backgroundColor: AppColors.surface, surfaceTintColor: Colors.transparent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
     bottomSheetTheme: const BottomSheetThemeData(backgroundColor: AppColors.surface, surfaceTintColor: Colors.transparent, showDragHandle: true, shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(26)))),
