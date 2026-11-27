@@ -1,0 +1,1207 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────── Identity & Access (Module 11) ─────────────
+enum Role {
+  admin
+  ga_head
+  supervisor
+  engineer
+  client
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  userCode     String?   @unique @map("user_code")
+  email        String?   @unique
+  phone        String?
+  passwordHash String    @map("password_hash")
+  fullName     String    @map("full_name")
+  role         Role
+  legacyGroup  String?   @map("legacy_group")
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  failedLogins Int       @default(0) @map("failed_logins") // consecutive wrong passwords; reset on success
+  lockedUntil  DateTime? @map("locked_until") // sign-in is refused until this time
+  passwordChangedAt DateTime? @map("password_changed_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  zones             UserZone[]
+  engineer          Engineer?
+  refreshTokens     RefreshToken[]
+  warehousesManaged Warehouse[]
+
+  deviceTokens DeviceToken[]
+  language     String? // app language chosen by the person: en | hi | gu | mr ...
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@map("refresh_tokens")
+}
+
+model Zone {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  userZones     UserZone[]
+  engineerZones EngineerZone[]
+  engineers     Engineer[]
+  branches      Branch[]
+  sites         ClientSite[]
+
+  @@map("zones")
+}
+
+model UserZone {
+  userId String @map("user_id") @db.Uuid
+  zoneId String @map("zone_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id])
+  zone   Zone   @relation(fields: [zoneId], references: [id])
+
+  @@id([userId, zoneId])
+  @@map("user_zones")
+}
+
+model ActivityLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id")
+  action      String
+  beforeState Json?    @map("before_state")
+  afterState  Json?    @map("after_state")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@map("activity_logs")
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique
+  value     Json
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+// ───────────── Lookup tables (admin-extendable, doc 04 section 2.1a) ─────────────
+model JobType {
+  id        String  @id @default(uuid()) @db.Uuid
+  code      String  @unique
+  label     String
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  jobs         Job[]
+  defaultPrice Decimal? @map("default_price") @db.Decimal(12, 2) // fixed service charge billed automatically when a job of this type is completed
+
+  @@map("job_types")
+}
+
+model JobPriority {
+  id        String  @id @default(uuid()) @db.Uuid
+  code      String  @unique
+  label     String
+  slaHours  Int?    @map("sla_hours")
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  jobs            Job[]
+  serviceRequests ServiceRequest[]
+
+  @@map("job_priorities")
+}
+
+model JobStatus {
+  id         String  @id @default(uuid()) @db.Uuid
+  code       String  @unique
+  label      String
+  isTerminal Boolean @default(false) @map("is_terminal")
+  sortOrder  Int     @default(0) @map("sort_order")
+
+  jobs Job[]
+
+  @@map("job_statuses")
+}
+
+model SkillCategory {
+  id             String          @id @default(uuid()) @db.Uuid
+  code           String          @unique
+  label          String
+  isActive       Boolean         @default(true) @map("is_active")
+  engineerSkills EngineerSkill[]
+
+  @@map("skill_categories")
+}
+
+// Replaces QuikAllot "Service Classfication": On Call / Warranty / AMC With spares / AMC Without spares
+model ContractType {
+  id           String     @id @default(uuid()) @db.Uuid
+  code         String     @unique
+  label        String
+  isChargeable Boolean    @default(false) @map("is_chargeable")
+  isActive     Boolean    @default(true) @map("is_active")
+  sortOrder    Int        @default(0) @map("sort_order")
+  contracts    Contract[]
+
+  @@map("contract_types")
+}
+
+model NotificationEventType {
+  id              String   @id @default(uuid()) @db.Uuid
+  code            String   @unique
+  label           String
+  defaultChannels String[] @default([]) @map("default_channels")
+  isActive        Boolean  @default(true) @map("is_active")
+
+  @@map("notification_event_types")
+}
+
+// QuikAllot "Service Charge" master: code + tax rates
+model ServiceChargeCode {
+  id               String   @id @default(uuid()) @db.Uuid
+  code             String   @unique
+  description      String?
+  taxLabelInState  String?  @map("tax_label_in_state")
+  taxRateInState   Decimal? @map("tax_rate_in_state") @db.Decimal(5, 2)
+  taxLabelOutState String?  @map("tax_label_out_state")
+  taxRateOutState  Decimal? @map("tax_rate_out_state") @db.Decimal(5, 2)
+  isActive         Boolean  @default(true) @map("is_active")
+
+  @@map("service_charge_codes")
+}
+
+// ───────────── Branches (service partners) ─────────────
+model Branch {
+  id              String  @id @default(uuid()) @db.Uuid
+  name            String  @unique
+  zoneId          String? @map("zone_id") @db.Uuid
+  proprietorName  String? @map("proprietor_name")
+  proprietorEmail String? @map("proprietor_email")
+  isActive        Boolean @default(true) @map("is_active")
+  zone            Zone?   @relation(fields: [zoneId], references: [id])
+
+  @@map("branches")
+}
+
+// ───────────── Client Management (Module 01) ─────────────
+model Client {
+  id            String   @id @default(uuid()) @db.Uuid
+  clientCode    String   @unique @map("client_code")
+  companyName   String   @map("company_name")
+  legalName     String?  @map("legal_name")
+  contactPerson String?  @map("contact_person")
+  phone         String?
+  email         String?
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  sites     ClientSite[]
+  contracts Contract[]
+  feedback  Feedback[]
+
+  serviceRequests ServiceRequest[]
+  jobs            Job[]
+  quotations      Quotation[]
+  invoices        Invoice[]
+
+  @@index([companyName])
+  @@map("clients")
+}
+
+model ClientSite {
+  id               String   @id @default(uuid()) @db.Uuid
+  clientId         String   @map("client_id") @db.Uuid
+  siteName         String   @map("site_name")
+  address          String?
+  state            String?
+  city             String?
+  zoneLabel        String?  @map("zone_label")
+  zoneId           String?  @map("zone_id") @db.Uuid
+  zoneLinkedBy     String?  @map("zone_linked_by") // 'name' = label equals the zone, 'group' = GROUP-n -> ZGroup-n, 'city' = city of the branch's users, 'manual'
+  pincode          String?
+  latitude         Decimal? @db.Decimal(9, 6)
+  longitude        Decimal? @db.Decimal(9, 6)
+  siteContactName  String?  @map("site_contact_name")
+  siteContactPhone String?  @map("site_contact_phone")
+  legacyUserId     String?  @unique @map("legacy_user_id")
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  client       Client        @relation(fields: [clientId], references: [id])
+  zone         Zone?         @relation(fields: [zoneId], references: [id])
+  siteProducts SiteProduct[]
+
+  serviceRequests ServiceRequest[]
+  jobs            Job[]
+  geoSource       String?          @map("geo_source") // manual | qr (learned from the engineer's first QR scan) | pincode / city (approximate)
+  geoAt           DateTime?        @map("geo_at")
+
+  @@unique([clientId, siteName])
+  @@index([clientId])
+  @@index([zoneId])
+  @@map("client_sites")
+}
+
+model Feedback {
+  id             String   @id @default(uuid()) @db.Uuid
+  clientId       String   @map("client_id") @db.Uuid
+  jobRef         String?  @map("job_ref")
+  rating         Int
+  comment        String?
+  submittedVia   String   @map("submitted_via")
+  gaHeadNotified Boolean  @default(false) @map("ga_head_notified")
+  createdAt      DateTime @default(now()) @map("created_at")
+  client         Client   @relation(fields: [clientId], references: [id])
+
+  @@map("feedback")
+}
+
+// ───────────── Product Management (Module 02) ─────────────
+model Brand {
+  id           String        @id @default(uuid()) @db.Uuid
+  name         String        @unique
+  isActive     Boolean       @default(true) @map("is_active")
+  productTypes ProductType[]
+
+  @@map("brands")
+}
+
+model ProductType {
+  id       String           @id @default(uuid()) @db.Uuid
+  brandId  String           @map("brand_id") @db.Uuid
+  name     String
+  isActive Boolean          @default(true) @map("is_active")
+  brand    Brand            @relation(fields: [brandId], references: [id])
+  variants ProductVariant[]
+  parts    SparePart[]
+
+  @@unique([brandId, name])
+  @@map("product_types")
+}
+
+model ProductVariant {
+  id            String         @id @default(uuid()) @db.Uuid
+  productTypeId String         @map("product_type_id") @db.Uuid
+  name          String
+  isActive      Boolean        @default(true) @map("is_active")
+  productType   ProductType    @relation(fields: [productTypeId], references: [id])
+  models        ProductModel[]
+
+  @@unique([productTypeId, name])
+  @@map("product_variants")
+}
+
+model ProductModel {
+  id               String         @id @default(uuid()) @db.Uuid
+  productVariantId String         @map("product_variant_id") @db.Uuid
+  name             String
+  specs            Json?
+  isActive         Boolean        @default(true) @map("is_active")
+  variant          ProductVariant @relation(fields: [productVariantId], references: [id])
+  siteProducts     SiteProduct[]
+
+  compatibleParts ProductCompatiblePart[]
+
+  @@unique([productVariantId, name])
+  @@map("product_models")
+}
+
+// A physical serial-numbered unit installed at a client site
+model SiteProduct {
+  id               String    @id @default(uuid()) @db.Uuid
+  clientSiteId     String    @map("client_site_id") @db.Uuid
+  productModelId   String?   @map("product_model_id") @db.Uuid
+  serialNumber     String?   @map("serial_number")
+  installationDate DateTime? @map("installation_date") @db.Date
+  warrantyExpiry   DateTime? @map("warranty_expiry") @db.Date
+  decommissionedAt DateTime? @map("decommissioned_at")
+  legacyAmcId      String?   @unique @map("legacy_amc_id")
+  rawBrand         String?   @map("raw_brand")
+  rawProduct       String?   @map("raw_product")
+  rawSubProduct    String?   @map("raw_sub_product")
+  rawModel         String?   @map("raw_model")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  site      ClientSite    @relation(fields: [clientSiteId], references: [id])
+  model     ProductModel? @relation(fields: [productModelId], references: [id])
+  contracts Contract[]
+
+  serviceRequests ServiceRequest[]
+  jobs            Job[]
+
+  @@index([serialNumber])
+  @@index([clientSiteId])
+  @@map("site_products")
+}
+
+// ───────────── AMC / CMC / Warranty (Module 01.3 / 07) ─────────────
+model Contract {
+  id                    String    @id @default(uuid()) @db.Uuid
+  contractNumber        String    @unique @map("contract_number")
+  clientId              String    @map("client_id") @db.Uuid
+  siteProductId         String?   @map("site_product_id") @db.Uuid
+  contractTypeId        String    @map("contract_type_id") @db.Uuid
+  externalContractNo    String?   @map("external_contract_no")
+  amount                Decimal?  @db.Decimal(12, 2)
+  taxLabel              String?   @map("tax_label")
+  startDate             DateTime? @map("start_date") @db.Date
+  endDate               DateTime? @map("end_date") @db.Date
+  visitFrequency        Int?      @map("visit_frequency")
+  freeServicesTotal     Int       @default(0) @map("free_services_total")
+  freeServicesCompleted Int       @default(0) @map("free_services_completed")
+  documentUrl           String?   @map("document_url")
+  documentName          String?   @map("document_name")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  client       Client            @relation(fields: [clientId], references: [id])
+  siteProduct  SiteProduct?      @relation(fields: [siteProductId], references: [id])
+  contractType ContractType      @relation(fields: [contractTypeId], references: [id])
+  renewals     ContractRenewal[]
+
+  jobs         Job[]
+  serviceCosts ContractServiceCost[]
+  visits       ContractVisit[]
+
+  @@index([endDate])
+  @@index([clientId])
+  @@map("contracts")
+}
+
+model ContractRenewal {
+  id              String   @id @default(uuid()) @db.Uuid
+  contractId      String   @map("contract_id") @db.Uuid
+  previousEndDate DateTime @map("previous_end_date") @db.Date
+  newEndDate      DateTime @map("new_end_date") @db.Date
+  renewedBy       String?  @map("renewed_by") @db.Uuid
+  renewedAt       DateTime @default(now()) @map("renewed_at")
+  contract        Contract @relation(fields: [contractId], references: [id])
+
+  @@map("contract_renewals")
+}
+
+// ───────────── Engineer Management (Module 03) ─────────────
+model Engineer {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @unique @map("user_id") @db.Uuid
+  employeeCode  String?   @unique @map("employee_code")
+  designation   String?
+  primaryZoneId String?   @map("primary_zone_id") @db.Uuid
+  city          String?
+  dateOfJoining DateTime? @map("date_of_joining") @db.Date
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  user        User               @relation(fields: [userId], references: [id])
+  primaryZone Zone?              @relation(fields: [primaryZoneId], references: [id])
+  zones       EngineerZone[]
+  skills      EngineerSkill[]
+  attendance  AttendanceRecord[]
+  leaves      LeaveRequest[]
+  locations   EngineerLocation[]
+
+  jobAssignments JobEngineer[]
+  partsUsed      JobPartUsed[]
+  travelLegs     JobTravel[]
+  workSessions   JobWorkSession[]
+  spareRequests  SpareRequest[]
+
+  @@map("engineers")
+}
+
+model EngineerZone {
+  engineerId String   @map("engineer_id") @db.Uuid
+  zoneId     String   @map("zone_id") @db.Uuid
+  engineer   Engineer @relation(fields: [engineerId], references: [id])
+  zone       Zone     @relation(fields: [zoneId], references: [id])
+
+  @@id([engineerId, zoneId])
+  @@map("engineer_zones")
+}
+
+model EngineerSkill {
+  engineerId      String        @map("engineer_id") @db.Uuid
+  skillCategoryId String        @map("skill_category_id") @db.Uuid
+  engineer        Engineer      @relation(fields: [engineerId], references: [id])
+  skill           SkillCategory @relation(fields: [skillCategoryId], references: [id])
+
+  @@id([engineerId, skillCategoryId])
+  @@map("engineer_skills")
+}
+
+model AttendanceRecord {
+  id               String              @id @default(uuid()) @db.Uuid
+  engineerId       String              @map("engineer_id") @db.Uuid
+  recordDate       DateTime            @map("record_date") @db.Date
+  checkInAt        DateTime            @map("check_in_at")
+  checkOutAt       DateTime?           @map("check_out_at")
+  isLate           Boolean             @default(false) @map("is_late")
+  isBackdated      Boolean             @default(false) @map("is_backdated")
+  flaggedForReview Boolean             @default(false) @map("flagged_for_review")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  engineer         Engineer            @relation(fields: [engineerId], references: [id])
+  sessions         AttendanceSession[]
+
+  @@unique([engineerId, recordDate])
+  @@map("attendance_records")
+}
+
+enum LeaveStatus {
+  pending
+  approved
+  rejected
+}
+
+model LeaveRequest {
+  id         String      @id @default(uuid()) @db.Uuid
+  engineerId String      @map("engineer_id") @db.Uuid
+  startDate  DateTime    @map("start_date") @db.Date
+  endDate    DateTime    @map("end_date") @db.Date
+  reason     String?
+  status     LeaveStatus @default(pending)
+  reviewedBy String?     @map("reviewed_by") @db.Uuid
+  reviewedAt DateTime?   @map("reviewed_at")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  engineer   Engineer    @relation(fields: [engineerId], references: [id])
+
+  @@map("leave_requests")
+}
+
+model EngineerLocation {
+  id         BigInt   @id @default(autoincrement())
+  engineerId String   @map("engineer_id") @db.Uuid
+  latitude   Decimal  @db.Decimal(9, 6)
+  longitude  Decimal  @db.Decimal(9, 6)
+  recordedAt DateTime @default(now()) @map("recorded_at")
+  engineer   Engineer @relation(fields: [engineerId], references: [id])
+  accuracyM  Int?     @map("accuracy_m")
+
+  @@index([engineerId, recordedAt])
+  @@map("engineer_locations")
+}
+
+// ───────────── Spare Parts & Warehouse (catalog + master needed now) ─────────────
+model SparePart {
+  id             String       @id @default(uuid()) @db.Uuid
+  partNumber     String       @unique @map("part_number")
+  name           String
+  hsnCode        String?      @map("hsn_code")
+  jobCategory    String?      @map("job_category")
+  productTypeId  String?      @map("product_type_id") @db.Uuid
+  rawProductName String?      @map("raw_product_name")
+  unit           String?
+  description    String?
+  unitPrice      Decimal?     @map("unit_price") @db.Decimal(12, 2)
+  isActive       Boolean      @default(true) @map("is_active")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  productType    ProductType? @relation(fields: [productTypeId], references: [id])
+
+  stock            InventoryStock[]
+  movements        StockMovement[]
+  defective        DefectiveItem[]
+  jobParts         JobPartUsed[]
+  poItems          PurchaseOrderItem[]
+  auditItems       StockAuditItem[]
+  compatibleModels ProductCompatiblePart[]
+  requestItems     SpareRequestItem[]
+
+  @@index([name])
+  @@map("spare_parts")
+}
+
+model Warehouse {
+  id            String  @id @default(uuid()) @db.Uuid
+  name          String  @unique
+  type          String?
+  address       String?
+  city          String?
+  state         String?
+  pincode       String?
+  managerUserId String? @map("manager_user_id") @db.Uuid
+  isActive      Boolean @default(true) @map("is_active")
+  manager       User?   @relation(fields: [managerUserId], references: [id])
+
+  stock          InventoryStock[]
+  movements      StockMovement[]
+  defective      DefectiveItem[]
+  purchaseOrders PurchaseOrder[]
+  audits         StockAudit[]
+
+  @@map("warehouses")
+}
+
+// ───────────── Notifications (Module 09 — table now, delivery in Phase 3) ─────────────
+model Notification {
+  id          String    @id @default(uuid()) @db.Uuid
+  recipientId String    @map("recipient_id") @db.Uuid
+  eventCode   String    @map("event_code")
+  channel     String
+  payload     Json?
+  isRead      Boolean   @default(false) @map("is_read")
+  sentAt      DateTime? @map("sent_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([recipientId, isRead])
+  @@map("notifications")
+}
+
+// ═════════════ Phase 2 / 3 tables (schema for all 11 modules is deployed up front, per the proposal) ═════════════
+
+enum ServiceRequestStatus {
+  open
+  converted
+  closed
+}
+
+enum JobEngineerRole {
+  primary
+  supporting
+}
+
+enum ClosureApproval {
+  pending
+  approved
+  rejected
+}
+
+enum AttachmentType {
+  photo_before
+  photo_after
+  signature
+  reference_doc
+}
+
+enum StockMovementType {
+  stock_in
+  stock_out
+  transfer_in
+  transfer_out
+  audit_adjustment
+}
+
+enum DefectiveStatus {
+  logged
+  replacement_initiated
+  disposed
+}
+
+enum PoStatus {
+  ordered
+  in_transit
+  received
+}
+
+enum QuotationStatus {
+  draft
+  sent
+  approved
+  rejected
+  converted
+}
+
+enum InvoiceStatus {
+  draft
+  cancelled
+  unpaid
+  partially_paid
+  paid
+  overdue
+}
+
+// ───────────── Module 04: Task & Job Allocation ─────────────
+model ServiceRequest {
+  id               String               @id @default(uuid()) @db.Uuid
+  ticketNumber     String               @unique @map("ticket_number")
+  clientId         String               @map("client_id") @db.Uuid
+  clientSiteId     String?              @map("client_site_id") @db.Uuid
+  siteProductId    String?              @map("site_product_id") @db.Uuid
+  issueDescription String?              @map("issue_description")
+  contactName      String?              @map("contact_name")
+  contactPhone     String?              @map("contact_phone")
+  priorityId       String               @map("priority_id") @db.Uuid
+  sourceChannel    String               @map("source_channel")
+  status           ServiceRequestStatus @default(open)
+  createdAt        DateTime             @default(now()) @map("created_at")
+
+  client      Client                     @relation(fields: [clientId], references: [id])
+  site        ClientSite?                @relation(fields: [clientSiteId], references: [id])
+  siteProduct SiteProduct?               @relation(fields: [siteProductId], references: [id])
+  priority    JobPriority                @relation(fields: [priorityId], references: [id])
+  jobs        Job[]
+  attachments ServiceRequestAttachment[]
+
+  @@index([status, createdAt])
+  @@map("service_requests")
+}
+
+// Photos sent with a service request (always stored as JPEG, 150 KB or less)
+model ServiceRequestAttachment {
+  id               String         @id @default(uuid()) @db.Uuid
+  serviceRequestId String         @map("service_request_id") @db.Uuid
+  fileUrl          String         @map("file_url")
+  sizeBytes        Int            @map("size_bytes")
+  originalBytes    Int            @map("original_bytes")
+  uploadedBy       String?        @map("uploaded_by") @db.Uuid
+  createdAt        DateTime       @default(now()) @map("created_at")
+  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id])
+
+  @@index([serviceRequestId])
+  @@map("service_request_attachments")
+}
+
+model Job {
+  id                 String           @id @default(uuid()) @db.Uuid
+  jobNumber          String           @unique @map("job_number")
+  serviceRequestId   String?          @map("service_request_id") @db.Uuid
+  clientId           String           @map("client_id") @db.Uuid
+  clientSiteId       String?          @map("client_site_id") @db.Uuid
+  siteProductId      String?          @map("site_product_id") @db.Uuid
+  contractId         String?          @map("contract_id") @db.Uuid
+  jobTypeId          String           @map("job_type_id") @db.Uuid
+  priorityId         String           @map("priority_id") @db.Uuid
+  statusId           String           @map("status_id") @db.Uuid
+  scheduledStart     DateTime?        @map("scheduled_start")
+  scheduledEnd       DateTime?        @map("scheduled_end")
+  actualStart        DateTime?        @map("actual_start")
+  actualEnd          DateTime?        @map("actual_end")
+  isBackdatedClosure Boolean          @default(false) @map("is_backdated_closure")
+  closureApproval    ClosureApproval? @map("closure_approval_status")
+  duplicateOfJobId   String?          @map("duplicate_of_job_id") @db.Uuid
+  description        String?
+  closureNotes       String?          @map("closure_notes")
+  signedByName       String?          @map("signed_by_name")
+  notAcceptedAlertAt DateTime?        @map("not_accepted_alert_at")
+  createdBy          String?          @map("created_by") @db.Uuid
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  serviceRequest ServiceRequest?       @relation(fields: [serviceRequestId], references: [id])
+  client         Client                @relation(fields: [clientId], references: [id])
+  site           ClientSite?           @relation(fields: [clientSiteId], references: [id])
+  siteProduct    SiteProduct?          @relation(fields: [siteProductId], references: [id])
+  contract       Contract?             @relation(fields: [contractId], references: [id])
+  jobType        JobType               @relation(fields: [jobTypeId], references: [id])
+  priority       JobPriority           @relation(fields: [priorityId], references: [id])
+  status         JobStatus             @relation(fields: [statusId], references: [id])
+  duplicateOf    Job?                  @relation("JobDuplicate", fields: [duplicateOfJobId], references: [id])
+  duplicates     Job[]                 @relation("JobDuplicate")
+  engineers      JobEngineer[]
+  history        JobStatusHistory[]
+  attachments    JobAttachment[]
+  partsUsed      JobPartUsed[]
+  defectiveItems DefectiveItem[]
+  serviceCosts   ContractServiceCost[]
+  quotations     Quotation[]
+  invoices       Invoice[]
+  phase          String? // travelling | working | on_hold (what the engineer is doing right now)
+  travelLegs     JobTravel[]
+  workSessions   JobWorkSession[]
+  spareRequests  SpareRequest[]
+
+  @@index([clientId, clientSiteId, siteProductId, statusId])
+  @@index([statusId, scheduledStart])
+  @@map("jobs")
+}
+
+model JobEngineer {
+  id                String          @id @default(uuid()) @db.Uuid
+  jobId             String          @map("job_id") @db.Uuid
+  engineerId        String          @map("engineer_id") @db.Uuid
+  role              JobEngineerRole
+  contributionNotes String?         @map("contribution_notes")
+  acceptedAt        DateTime?       @map("accepted_at")
+  declinedAt        DateTime?       @map("declined_at")
+  declineReason     String?         @map("decline_reason")
+  job               Job             @relation(fields: [jobId], references: [id])
+  engineer          Engineer        @relation(fields: [engineerId], references: [id])
+
+  @@unique([jobId, engineerId])
+  @@map("job_engineers")
+}
+
+model JobStatusHistory {
+  id         String   @id @default(uuid()) @db.Uuid
+  jobId      String   @map("job_id") @db.Uuid
+  fromStatus String?  @map("from_status")
+  toStatus   String   @map("to_status")
+  changedBy  String?  @map("changed_by") @db.Uuid
+  changedAt  DateTime @default(now()) @map("changed_at")
+  job        Job      @relation(fields: [jobId], references: [id])
+
+  @@index([jobId])
+  @@map("job_status_history")
+}
+
+model JobAttachment {
+  id         String         @id @default(uuid()) @db.Uuid
+  jobId      String         @map("job_id") @db.Uuid
+  type       AttachmentType
+  fileUrl    String         @map("file_url")
+  uploadedBy String?        @map("uploaded_by") @db.Uuid
+  createdAt  DateTime       @default(now()) @map("created_at")
+  job        Job            @relation(fields: [jobId], references: [id])
+
+  @@map("job_attachments")
+}
+
+model JobPartUsed {
+  id          String    @id @default(uuid()) @db.Uuid
+  jobId       String    @map("job_id") @db.Uuid
+  sparePartId String    @map("spare_part_id") @db.Uuid
+  engineerId  String    @map("engineer_id") @db.Uuid
+  quantity    Int
+  warehouseId String?   @map("warehouse_id") @db.Uuid
+  deductedAt  DateTime? @map("deducted_at")
+  allocatedAt DateTime? @map("allocated_at")
+  consumedAt  DateTime? @map("consumed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  job         Job       @relation(fields: [jobId], references: [id])
+  sparePart   SparePart @relation(fields: [sparePartId], references: [id])
+  engineer    Engineer  @relation(fields: [engineerId], references: [id])
+  returnQty   Int       @default(0) @map("return_qty") // allocated but not used: has to go back to the hub
+  returnedAt  DateTime? @map("returned_at")
+  returnedBy  String?   @map("returned_by") @db.Uuid
+
+  @@index([jobId])
+  @@map("job_parts_used")
+}
+
+// ───────────── Modules 05 / 06: Spare parts, inventory, warehouse ─────────────
+// Model-level compatibility (doc 08: parts link to the product model, not a flat product)
+model ProductCompatiblePart {
+  productModelId String       @map("product_model_id") @db.Uuid
+  sparePartId    String       @map("spare_part_id") @db.Uuid
+  model          ProductModel @relation(fields: [productModelId], references: [id])
+  sparePart      SparePart    @relation(fields: [sparePartId], references: [id])
+
+  @@id([productModelId, sparePartId])
+  @@map("product_compatible_parts")
+}
+
+// available / pending / defective are tracked separately and never merged (PRD rule 3)
+model InventoryStock {
+  id               String    @id @default(uuid()) @db.Uuid
+  warehouseId      String    @map("warehouse_id") @db.Uuid
+  sparePartId      String    @map("spare_part_id") @db.Uuid
+  availableQty     Int       @default(0) @map("available_qty")
+  pendingQty       Int       @default(0) @map("pending_qty")
+  defectiveQty     Int       @default(0) @map("defective_qty")
+  reorderThreshold Int       @default(0) @map("reorder_threshold")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  warehouse        Warehouse @relation(fields: [warehouseId], references: [id])
+  sparePart        SparePart @relation(fields: [sparePartId], references: [id])
+
+  @@unique([warehouseId, sparePartId])
+  @@map("inventory_stock")
+}
+
+model StockMovement {
+  id            String            @id @default(uuid()) @db.Uuid
+  warehouseId   String            @map("warehouse_id") @db.Uuid
+  sparePartId   String            @map("spare_part_id") @db.Uuid
+  movementType  StockMovementType @map("movement_type")
+  quantity      Int
+  reason        String?
+  referenceType String?           @map("reference_type")
+  referenceId   String?           @map("reference_id") @db.Uuid
+  recordedBy    String?           @map("recorded_by") @db.Uuid
+  createdAt     DateTime          @default(now()) @map("created_at")
+  warehouse     Warehouse         @relation(fields: [warehouseId], references: [id])
+  sparePart     SparePart         @relation(fields: [sparePartId], references: [id])
+
+  @@index([warehouseId, createdAt])
+  @@map("stock_movements")
+}
+
+model DefectiveItem {
+  id          String          @id @default(uuid()) @db.Uuid
+  warehouseId String          @map("warehouse_id") @db.Uuid
+  sparePartId String          @map("spare_part_id") @db.Uuid
+  jobId       String?         @map("job_id") @db.Uuid
+  quantity    Int
+  notes       String?
+  status      DefectiveStatus @default(logged)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  warehouse   Warehouse       @relation(fields: [warehouseId], references: [id])
+  sparePart   SparePart       @relation(fields: [sparePartId], references: [id])
+  job         Job?            @relation(fields: [jobId], references: [id])
+
+  @@map("defective_items")
+}
+
+model PurchaseOrder {
+  id          String              @id @default(uuid()) @db.Uuid
+  poNumber    String              @unique @map("po_number")
+  warehouseId String              @map("warehouse_id") @db.Uuid
+  status      PoStatus            @default(ordered)
+  createdBy   String?             @map("created_by") @db.Uuid
+  createdAt   DateTime            @default(now()) @map("created_at")
+  warehouse   Warehouse           @relation(fields: [warehouseId], references: [id])
+  items       PurchaseOrderItem[]
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id               String        @id @default(uuid()) @db.Uuid
+  purchaseOrderId  String        @map("purchase_order_id") @db.Uuid
+  sparePartId      String        @map("spare_part_id") @db.Uuid
+  quantityOrdered  Int           @map("quantity_ordered")
+  quantityReceived Int           @default(0) @map("quantity_received")
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  sparePart        SparePart     @relation(fields: [sparePartId], references: [id])
+
+  @@map("purchase_order_items")
+}
+
+model StockAudit {
+  id          String           @id @default(uuid()) @db.Uuid
+  warehouseId String           @map("warehouse_id") @db.Uuid
+  conductedBy String?          @map("conducted_by") @db.Uuid
+  conductedAt DateTime         @default(now()) @map("conducted_at")
+  notes       String?
+  warehouse   Warehouse        @relation(fields: [warehouseId], references: [id])
+  items       StockAuditItem[]
+
+  @@map("stock_audits")
+}
+
+model StockAuditItem {
+  id            String     @id @default(uuid()) @db.Uuid
+  stockAuditId  String     @map("stock_audit_id") @db.Uuid
+  sparePartId   String     @map("spare_part_id") @db.Uuid
+  systemCount   Int        @map("system_count")
+  physicalCount Int        @map("physical_count")
+  discrepancy   Int
+  flagged       Boolean    @default(false)
+  stockAudit    StockAudit @relation(fields: [stockAuditId], references: [id])
+  sparePart     SparePart  @relation(fields: [sparePartId], references: [id])
+
+  @@map("stock_audit_items")
+}
+
+// ───────────── Module 07: AMC service cost history ─────────────
+model ContractServiceCost {
+  id         String   @id @default(uuid()) @db.Uuid
+  contractId String   @map("contract_id") @db.Uuid
+  jobId      String   @map("job_id") @db.Uuid
+  cost       Decimal  @db.Decimal(12, 2)
+  source     String   @default("manual")
+  notes      String?
+  recordedBy String?  @map("recorded_by") @db.Uuid
+  recordedAt DateTime @default(now()) @map("recorded_at")
+  contract   Contract @relation(fields: [contractId], references: [id])
+  job        Job      @relation(fields: [jobId], references: [id])
+
+  @@map("contract_service_costs")
+}
+
+// ───────────── Module 08: Quotations, invoices, payments ─────────────
+model Quotation {
+  id              String          @id @default(uuid()) @db.Uuid
+  quotationNumber String          @unique @map("quotation_number")
+  clientId        String          @map("client_id") @db.Uuid
+  clientSiteId    String?         @map("client_site_id") @db.Uuid
+  siteProductId   String?         @map("site_product_id") @db.Uuid
+  jobId           String?         @map("job_id") @db.Uuid
+  title           String?
+  notes           String?
+  validUntil      DateTime?       @map("valid_until") @db.Date
+  taxBreakup      Json?           @map("tax_breakup")
+  lineItems       Json            @map("line_items")
+  currency        String          @default("INR") @db.Char(3)
+  subtotal        Decimal         @db.Decimal(12, 2)
+  taxAmount       Decimal         @default(0) @map("tax_amount") @db.Decimal(12, 2)
+  total           Decimal         @db.Decimal(12, 2)
+  status          QuotationStatus @default(draft)
+  isPriceLocked   Boolean         @default(false) @map("is_price_locked")
+  approvedAt      DateTime?       @map("approved_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  client          Client          @relation(fields: [clientId], references: [id])
+  job             Job?            @relation(fields: [jobId], references: [id])
+  invoices        Invoice[]
+
+  @@map("quotations")
+}
+
+model Invoice {
+  id             String           @id @default(uuid()) @db.Uuid
+  invoiceNumber  String           @unique @map("invoice_number")
+  jobId          String?          @map("job_id") @db.Uuid
+  clientId       String           @map("client_id") @db.Uuid
+  quotationId    String?          @map("quotation_id") @db.Uuid
+  currency       String           @default("INR") @db.Char(3)
+  serviceCharges Decimal          @default(0) @map("service_charges") @db.Decimal(12, 2)
+  partsCharges   Decimal          @default(0) @map("parts_charges") @db.Decimal(12, 2)
+  laborCharges   Decimal          @default(0) @map("labor_charges") @db.Decimal(12, 2)
+  taxAmount      Decimal          @default(0) @map("tax_amount") @db.Decimal(12, 2)
+  totalAmount    Decimal          @map("total_amount") @db.Decimal(12, 2)
+  status         InvoiceStatus    @default(unpaid)
+  lineItems      Json             @default("[]") @map("line_items")
+  notes          String?
+  dueDate        DateTime?        @map("due_date") @db.Date
+  issuedAt       DateTime?        @map("issued_at")
+  paidAmount     Decimal          @default(0) @map("paid_amount") @db.Decimal(12, 2)
+  lastReminderAt DateTime?        @map("last_reminder_at")
+  isAmc          Boolean          @default(false) @map("is_amc")
+  pdfUrl         String?          @map("pdf_url")
+  sharedVia      String[]         @default([]) @map("shared_via")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  job            Job?             @relation(fields: [jobId], references: [id])
+  client         Client           @relation(fields: [clientId], references: [id])
+  quotation      Quotation?       @relation(fields: [quotationId], references: [id])
+  taxLines       InvoiceTaxLine[]
+  payments       Payment[]
+  autoGenerated  Boolean          @default(false) @map("auto_generated") // prepared by the system when the job was completed; waits in the drafts for a senior person
+
+  @@map("invoices")
+}
+
+// extension point for GST-style CGST/SGST/IGST breakdown without touching invoices
+model InvoiceTaxLine {
+  id          String  @id @default(uuid()) @db.Uuid
+  invoiceId   String  @map("invoice_id") @db.Uuid
+  taxLabel    String  @map("tax_label")
+  ratePercent Decimal @map("rate_percent") @db.Decimal(5, 2)
+  amount      Decimal @db.Decimal(12, 2)
+  invoice     Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@map("invoice_tax_lines")
+}
+
+model Payment {
+  id            String   @id @default(uuid()) @db.Uuid
+  invoiceId     String   @map("invoice_id") @db.Uuid
+  amount        Decimal  @db.Decimal(12, 2)
+  paymentMethod String?  @map("payment_method")
+  reference     String?
+  notes         String?
+  paidAt        DateTime @default(now()) @map("paid_at")
+  recordedBy    String?  @map("recorded_by") @db.Uuid
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id])
+
+  @@map("payments")
+}
+
+// ───────────── Module 09 / 10: push devices + scheduled reports ─────────────
+model DeviceToken {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  token      String   @unique
+  platform   String
+  createdAt  DateTime @default(now()) @map("created_at")
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+model ScheduledReport {
+  id           String    @id @default(uuid()) @db.Uuid
+  reportType   String    @map("report_type")
+  frequency    String
+  recipients   String[]
+  exportFormat String    @map("export_format")
+  isActive     Boolean   @default(true) @map("is_active")
+  lastRunAt    DateTime? @map("last_run_at")
+  createdBy    String?   @map("created_by") @db.Uuid
+
+  @@map("scheduled_reports")
+}
+
+// ───────────── Module 09: messages sent (or attempted) to clients ─────────────
+// Every outgoing email / SMS / WhatsApp is logged here, whether or not a gateway is configured.
+model OutboundMessage {
+  id        String    @id @default(uuid()) @db.Uuid
+  channel   String
+  toAddress String    @map("to_address")
+  subject   String?
+  body      String
+  eventCode String    @map("event_code")
+  clientId  String?   @map("client_id") @db.Uuid
+  refType   String?   @map("ref_type")
+  refId     String?   @map("ref_id") @db.Uuid
+  status    String    @default("queued")
+  error     String?
+  createdAt DateTime  @default(now()) @map("created_at")
+  sentAt    DateTime? @map("sent_at")
+
+  @@index([createdAt])
+  @@index([status])
+  @@map("outbound_messages")
+}
+
+// ───────────── Access control (editable by the admin core team) ─────────────
+// level: none | view | manage. Admin is always manage on everything and cannot be restricted.
+model RolePermission {
+  role   Role
+  module String
+  level  String
+
+  @@id([role, module])
+  @@map("role_permissions")
+}
+
+model UserPermission {
+  userId String @map("user_id") @db.Uuid
+  module String
+  level  String
+
+  @@id([userId, module])
+  @@map("user_permissions")
+}
+
+// ───────────── Travel, work time and spare requests ─────────────
+// One trip to a customer site: starts when the engineer presses Start, ends when the machine's QR code is scanned at the site.
+model JobTravel {
+  id               String    @id @default(uuid()) @db.Uuid
+  jobId            String    @map("job_id") @db.Uuid
+  engineerId       String    @map("engineer_id") @db.Uuid
+  seq              Int       @default(1)
+  status           String    @default("travelling") // travelling | arrived | cancelled
+  mode             String // direct | app_route | at_site
+  startedAt        DateTime  @map("started_at")
+  startLat         Decimal   @map("start_lat") @db.Decimal(9, 6)
+  startLng         Decimal   @map("start_lng") @db.Decimal(9, 6)
+  siteLat          Decimal?  @map("site_lat") @db.Decimal(9, 6)
+  siteLng          Decimal?  @map("site_lng") @db.Decimal(9, 6)
+  siteGeoSource    String?   @map("site_geo_source")
+  straightKm       Decimal?  @map("straight_km") @db.Decimal(8, 2)
+  expectedKm       Decimal?  @map("expected_km") @db.Decimal(8, 2)
+  expectedMinutes  Int?      @map("expected_minutes")
+  routeSource      String?   @map("route_source") // osrm | estimate | none
+  endedAt          DateTime? @map("ended_at")
+  endLat           Decimal?  @map("end_lat") @db.Decimal(9, 6)
+  endLng           Decimal?  @map("end_lng") @db.Decimal(9, 6)
+  arrivalDistanceM Int?      @map("arrival_distance_m")
+  arrivedBy        String?   @map("arrived_by") // qr | qr_override | office
+  actualKm         Decimal?  @map("actual_km") @db.Decimal(8, 2)
+  actualMinutes    Int?      @map("actual_minutes")
+  toleranceKm      Decimal?  @map("tolerance_km") @db.Decimal(8, 2)
+  excessKm         Decimal?  @map("excess_km") @db.Decimal(8, 2)
+  reason           String?
+  reasonLang       String?   @map("reason_lang")
+  reasonVoice      Boolean   @default(false) @map("reason_voice")
+  review           String    @default("none") // none | pending | approved | rejected
+  reviewedBy       String?   @map("reviewed_by") @db.Uuid
+  reviewedAt       DateTime? @map("reviewed_at")
+  reviewNote       String?   @map("review_note")
+  payableKm        Decimal?  @map("payable_km") @db.Decimal(8, 2)
+  ratePerKm        Decimal?  @map("rate_per_km") @db.Decimal(8, 2)
+  amount           Decimal?  @db.Decimal(10, 2)
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  job      Job      @relation(fields: [jobId], references: [id])
+  engineer Engineer @relation(fields: [engineerId], references: [id])
+
+  @@index([jobId])
+  @@index([engineerId, startedAt])
+  @@map("job_travels")
+}
+
+// One stretch of work at the site. The job clock is the sum of these; it stops while the job waits for spares.
+model JobWorkSession {
+  id         String    @id @default(uuid()) @db.Uuid
+  jobId      String    @map("job_id") @db.Uuid
+  engineerId String    @map("engineer_id") @db.Uuid
+  travelId   String?   @map("travel_id") @db.Uuid
+  startedAt  DateTime  @map("started_at")
+  endedAt    DateTime? @map("ended_at")
+  endReason  String?   @map("end_reason") // completed | spare_hold | other
+  job        Job       @relation(fields: [jobId], references: [id])
+  engineer   Engineer  @relation(fields: [engineerId], references: [id])
+
+  @@index([jobId])
+  @@map("job_work_sessions")
+}
+
+model SpareRequest {
+  id           String             @id @default(uuid()) @db.Uuid
+  jobId        String             @map("job_id") @db.Uuid
+  engineerId   String             @map("engineer_id") @db.Uuid
+  status       String             @default("requested") // requested | allocated | rejected | cancelled
+  note         String?
+  warehouseId  String?            @map("warehouse_id") @db.Uuid
+  hubName      String?            @map("hub_name")
+  hubAddress   String?            @map("hub_address")
+  decidedBy    String?            @map("decided_by") @db.Uuid
+  decidedAt    DateTime?          @map("decided_at")
+  decisionNote String?            @map("decision_note")
+  collectedAt  DateTime?          @map("collected_at")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  job          Job                @relation(fields: [jobId], references: [id])
+  engineer     Engineer           @relation(fields: [engineerId], references: [id])
+  items        SpareRequestItem[]
+
+  @@index([jobId])
+  @@index([status])
+  @@map("spare_requests")
+}
+
+model SpareRequestItem {
+  id           String       @id @default(uuid()) @db.Uuid
+  requestId    String       @map("request_id") @db.Uuid
+  sparePartId  String       @map("spare_part_id") @db.Uuid
+  quantity     Int
+  allocatedQty Int          @default(0) @map("allocated_qty")
+  request      SpareRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  sparePart    SparePart    @relation(fields: [sparePartId], references: [id])
+
+  @@map("spare_request_items")
+}
+
+// The planned service visits of an AMC / CMC / warranty contract (one row per visit, made from the contract's dates and number of services).
+model ContractVisit {
+  id         String   @id @default(uuid()) @db.Uuid
+  contractId String   @map("contract_id") @db.Uuid
+  seq        Int
+  dueDate    DateTime @map("due_date") @db.Date
+  status     String   @default("planned") // planned | assigned | done | skipped
+  jobId      String?  @map("job_id") @db.Uuid
+  engineerId String?  @map("engineer_id") @db.Uuid
+  note       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  contract   Contract @relation(fields: [contractId], references: [id])
+
+  @@unique([contractId, seq])
+  @@index([dueDate, status])
+  @@index([jobId])
+  @@map("contract_visits")
+}
+
+// Every stretch on duty: an engineer can check in and out as many times as needed in a day.
+// The day's record keeps the first check-in and the latest check-out (empty while on duty).
+model AttendanceSession {
+  id           String           @id @default(uuid()) @db.Uuid
+  attendanceId String           @map("attendance_id") @db.Uuid
+  checkInAt    DateTime         @map("check_in_at")
+  checkOutAt   DateTime?        @map("check_out_at")
+  attendance   AttendanceRecord @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+
+  @@index([attendanceId])
+  @@map("attendance_sessions")
+}

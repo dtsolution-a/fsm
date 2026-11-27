@@ -1,0 +1,64 @@
+# Production-like stack on one machine (also usable on a single EC2 box).
+#   cp .env.example .env   # then fill in the values
+#   docker compose up -d --build
+#   docker compose run --rm backend node dist-tools/seed.js     # first run only: lookups + admin user
+# App is served on http://<this machine>:${HTTP_PORT:-80} (UI at /, API at /api/v1) - same layout as the AWS load balancer.
+name: fsm
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fsm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: fsm
+    ports:
+      - "127.0.0.1:5432:5432"   # reachable only from the server itself (use an SSH tunnel to load data from your PC)
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fsm -d fsm"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://fsm:${POSTGRES_PASSWORD}@db:5432/fsm?schema=public
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (32+ random chars) in .env}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      RUN_MIGRATIONS: "true"
+    volumes:
+      - uploads:/data/uploads   # photos and signatures survive rebuilds
+
+  web:
+    build:
+      context: ./web
+      args:
+        NEXT_PUBLIC_API_URL: /api/v1
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  proxy:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+      - backend
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./infra/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+volumes:
+  pgdata:
+  uploads:

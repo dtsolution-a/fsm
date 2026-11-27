@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* Shah Engineers brand palette (taken from the company website: accent #2563EB, deep blue #1E3A8A, ink #0F172A, Poppins). Corporate palette: the whole admin panel was written against "indigo", so re-pointing that ramp to a deep corporate blue re-colours every page at once. */
+@theme {
+  --color-indigo-50: #eff6ff;
+  --color-indigo-100: #dbeafe;
+  --color-indigo-200: #bfdbfe;
+  --color-indigo-300: #93c5fd;
+  --color-indigo-400: #60a5fa;
+  --color-indigo-500: #3b82f6;
+  --color-indigo-600: #2563eb;
+  --color-indigo-700: #1d4ed8;
+  --color-indigo-800: #1e40af;
+  --color-indigo-900: #1e3a8a;
+  --color-navy: #0f172a;
+  --color-navy-soft: #1e293b;
+  --color-surface: #f4f6f9;
+  --font-sans: var(--font-poppins), var(--font-deva), system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+html { color-scheme: light; }
+body { background: var(--color-surface); font-feature-settings: "tnum" 1, "cv11" 1; -webkit-font-smoothing: antialiased; }
+
+/* Quieter scrollbars */
+* { scrollbar-width: thin; scrollbar-color: #c3ccd8 transparent; }
+
+/* Leaflet needs a height on its container */
+.leaflet-container { height: 100%; width: 100%; border-radius: 0.5rem; }
+
+/* Keyboard focus is always visible, mouse focus stays calm */
+:focus-visible { outline: 2px solid var(--color-indigo-500); outline-offset: 2px; }

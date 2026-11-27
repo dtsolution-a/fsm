@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars and adjust. Everything has a default; the first deploy works with none of these.
+
+region      = "ap-south-1"
+environment = "prod"
+
+# Set after you request an ACM certificate for your domain in the same region (enables HTTPS):
+# certificate_arn = "arn:aws:acm:ap-south-1:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# Production recommendations
+# desired_count     = 2
+# db_multi_az       = true
+# db_instance_class = "db.t4g.small"
+
+# Turn on only while importing data into the private database, then off again:
+# create_bastion = true

@@ -1,0 +1,69 @@
+# ---- secrets and real customer data: never in git ----
+.env
+.env.*
+!.env.example
+Data/
+R n D/
+**/*credentials*.csv
+**/demo-kit-credentials.csv
+*.pem
+*.key
+*.keystore
+*.jks
+key.properties
+terraform.tfstate*
+.terraform/
+*.tfvars
+
+# ---- local databases, uploads, logs, run reports ----
+.pgdata/
+**/.pgdata/
+**/.pgdev.log
+uploads/
+uploads-test/
+**/uploads/
+**/uploads-test/
+*.log
+*.err
+backend/import-*.json
+backend/link-zones-report.json
+backend/scripts/.demo-manifest.json
+
+# ---- build output and dependencies ----
+node_modules/
+dist/
+dist-tools/
+.next/
+out/
+build/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# ---- Flutter ----
+mobile/.dart_tool/
+mobile/.flutter-plugins*
+mobile/.packages
+mobile/build/
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/app/debug/
+mobile/android/app/profile/
+mobile/android/app/release/
+*.apk
+*.aab
+*.ipa
+
+# ---- office and editor leftovers ----
+~$*
+*.tmp
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.claude/
+
+# regression run output
+backend/regress*
+backend/.api*
+web/.web-dev.*

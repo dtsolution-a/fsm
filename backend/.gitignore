@@ -1,0 +1,10 @@
+node_modules
+dist
+.pgdata
+.pgdev.log
+.env
+uploads
+import-credentials.csv
+import-users-report.json
+demo-credentials.csv
+scripts/.demo-manifest.json
