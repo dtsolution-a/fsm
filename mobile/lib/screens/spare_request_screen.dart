@@ -8,7 +8,9 @@ import 'travel_flow.dart' show BigButton;
 class SpareRequestScreen extends StatefulWidget {
   final ApiClient api;
   final Map<String, dynamic> job;
-  const SpareRequestScreen({super.key, required this.api, required this.job});
+  /// An open request to change (add parts, change numbers, remove parts); null = a new request.
+  final Map<String, dynamic>? existing;
+  const SpareRequestScreen({super.key, required this.api, required this.job, this.existing});
 
   @override
   State<SpareRequestScreen> createState() => _SpareRequestScreenState();
@@ -21,6 +23,22 @@ class _SpareRequestScreenState extends State<SpareRequestScreen> {
   final Map<String, Map<String, dynamic>> _picked = {}; // partId -> {part, qty}
   String? _msg;
   bool _busy = false;
+  bool get _editing => widget.existing != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final ex = widget.existing;
+    if (ex != null) {
+      for (final i in ((ex['items'] as List?) ?? const [])) {
+        final sp = Map<String, dynamic>.from((i as Map)['sparePart'] as Map);
+        final id = (i['sparePartId'] ?? sp['id']) as String;
+        sp['id'] = id;
+        _picked[id] = {'part': sp, 'qty': i['quantity'] as int};
+      }
+      _note.text = (ex['note'] ?? '') as String;
+    }
+  }
 
   @override
   void dispose() {
@@ -42,11 +60,16 @@ class _SpareRequestScreenState extends State<SpareRequestScreen> {
   Future<void> _send() async {
     setState(() { _busy = true; _msg = null; });
     try {
-      await widget.api.post('/jobs/${widget.job['id']}/spare-requests', {
+      final body = {
         'items': [for (final e in _picked.values) {'sparePartId': e['part']['id'], 'quantity': e['qty']}],
         if (_note.text.trim().isNotEmpty) 'note': _note.text.trim(),
-      });
-      if (mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('spare_sent')))); Navigator.of(context).pop(true); }
+      };
+      if (_editing) {
+        await widget.api.patch('/engineers/me/spare-requests/${widget.existing!['id']}', body);
+      } else {
+        await widget.api.post('/jobs/${widget.job['id']}/spare-requests', body);
+      }
+      if (mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(_editing ? 'request_changed' : 'spare_sent')))); Navigator.of(context).pop(true); }
     } on ApiException catch (e) {
       if (mounted) setState(() { _msg = e.isNetwork ? tr('need_net') : e.message; _busy = false; });
     }
@@ -54,12 +77,12 @@ class _SpareRequestScreenState extends State<SpareRequestScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(tr('need_spares'), style: const TextStyle(fontSize: 16))),
+        appBar: AppBar(title: Text(tr(_editing ? 'spare_edit_title' : 'need_spares'), style: const TextStyle(fontSize: 16))),
         body: SafeArea(
           child: Column(children: [
             Expanded(
               child: ListView(padding: const EdgeInsets.all(16), children: [
-                Text(tr('spare_title'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                Text(tr(_editing ? 'spare_edit_hint' : 'spare_title'), style: TextStyle(fontSize: _editing ? 14 : 18, fontWeight: _editing ? FontWeight.w500 : FontWeight.w700)),
                 const SizedBox(height: 12),
                 TextField(controller: _search, onChanged: _lookup, style: const TextStyle(fontSize: 17), decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: tr('spare_search'), border: const OutlineInputBorder())),
                 if (_msg != null) Padding(padding: const EdgeInsets.all(10), child: Text(_msg!, style: const TextStyle(color: AppColors.danger))),
@@ -83,7 +106,7 @@ class _SpareRequestScreenState extends State<SpareRequestScreen> {
                 TextField(controller: _note, maxLines: 2, decoration: InputDecoration(labelText: tr('spare_note'), border: const OutlineInputBorder())),
               ]),
             ),
-            Padding(padding: const EdgeInsets.all(16), child: BigButton(label: tr('spare_send'), icon: Icons.send, onPressed: _picked.isEmpty || _busy ? null : _send)),
+            Padding(padding: const EdgeInsets.all(16), child: BigButton(label: tr(_editing ? 'spare_update' : 'spare_send'), icon: Icons.send, onPressed: _picked.isEmpty || _busy ? null : _send)),
           ]),
         ),
       );

@@ -17,7 +17,7 @@ export default function SpareRequests() {
   return (
     <>
       <PageHeader title="Spare part requests" subtitle="An engineer at a machine needs parts he does not have. His job waits until you give them from a hub; he is told where to collect and the job is rescheduled." />
-      <Card actions={<Select className="w-44" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="requested">Waiting for a decision</option><option value="allocated">Given</option><option value="rejected">Not available</option><option value="">All</option></Select>}>
+      <Card actions={<Select className="w-44" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="requested">Waiting for a decision</option><option value="allocated">Given</option><option value="rejected">Not available</option><option value="cancelled">Cancelled by engineer</option><option value="">All</option></Select>}>
         {error && <ErrorNote message={error} />}
         {loading && !data ? <Spinner /> : (
           <>

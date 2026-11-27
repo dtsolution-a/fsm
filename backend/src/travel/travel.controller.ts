@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Header, Module, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Header, Module, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Auth, CurrentUser } from '../auth/guards';
@@ -96,6 +96,15 @@ export class TravelController {
 
   @Post('jobs/:id/spare-requests') @Auth('engineer')
   askSpares(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() d: SpareDto) { return this.spares.create(u, id, d); }
+
+  @Patch('engineers/me/spare-requests/:id') @Auth('engineer')
+  changeSpares(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() d: SpareDto) { return this.spares.update(u, id, d); }
+
+  @Post('engineers/me/spare-requests/:id/cancel') @Auth('engineer')
+  cancelSpares(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) { return this.spares.cancel(u, id); }
+
+  @Post('engineers/me/spare-requests/:id/resume') @Auth('engineer')
+  resumeAfterSpares(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) { return this.spares.resume(u, id); }
 
   @Get('engineers/me/spare-requests') @Auth('engineer')
   mySpares(@CurrentUser() u: AuthUser) { return this.spares.mine(u); }

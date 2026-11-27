@@ -1,6 +1,7 @@
 /// More app texts (screens other than the journey), in English / Hindi / Gujarati / Marathi. Merged into tr() by l10n.dart.
 const moreT = <String, Map<String, String>>{
   'en': {
+    'continue_work': 'Continue the work', 'change_request': 'Change the request', 'cancel_request': 'Cancel the request', 'cancel_request_q': 'Cancel this spare request? The job will start again.', 'keep_it': 'No, keep it', 'yes_cancel': 'Yes, cancel', 'request_changed': 'Request updated. The office has been told.', 'request_cancelled': 'Request cancelled. You can carry on with the job.', 'work_resumed': 'Work started again. The request is still with the office.', 'my_spare_request': 'My spare request (waiting)', 'spare_open_note': 'Your spare request is with the office. You can change or cancel it until they give the parts.', 'spare_update': 'Save changes', 'spare_edit_title': 'Change your spare request', 'spare_edit_hint': 'Add parts you forgot, change numbers or remove parts. The office will see the new list.',
     'save': 'Save',
     'security': 'Security', 'change_password': 'Change password', 'current_password': 'Current password', 'new_password': 'New password', 'password_rule': 'At least 10 characters, with a letter and a number', 'password_changed': 'Password changed',
     'check_in_again': 'Check in again', 'worked_today': 'Worked today: {t}  ·  {n} stretch(es)',
@@ -35,6 +36,7 @@ const moreT = <String, Map<String, String>>{
     'lv_pending': 'Pending', 'lv_approved': 'Approved', 'lv_rejected': 'Rejected',
   },
   'hi': {
+    'continue_work': 'काम फिर चालू करें', 'change_request': 'अनुरोध बदलें', 'cancel_request': 'अनुरोध रद्द करें', 'cancel_request_q': 'यह स्पेयर पार्ट अनुरोध रद्द करें? जॉब फिर चालू हो जाएगी।', 'keep_it': 'नहीं, रहने दें', 'yes_cancel': 'हाँ, रद्द करें', 'request_changed': 'अनुरोध बदल दिया। ऑफिस को बता दिया गया है।', 'request_cancelled': 'अनुरोध रद्द हुआ। आप जॉब जारी रख सकते हैं।', 'work_resumed': 'काम फिर शुरू हुआ। अनुरोध अभी ऑफिस के पास है।', 'my_spare_request': 'मेरा स्पेयर पार्ट अनुरोध (इंतज़ार में)', 'spare_open_note': 'आपका स्पेयर पार्ट अनुरोध ऑफिस के पास है। पार्ट मिलने तक आप इसे बदल या रद्द कर सकते हैं।', 'spare_update': 'बदलाव सहेजें', 'spare_edit_title': 'अपना स्पेयर पार्ट अनुरोध बदलें', 'spare_edit_hint': 'भूले हुए पार्ट जोड़ें, संख्या बदलें या पार्ट हटाएँ। ऑफिस को नई सूची दिखेगी।',
     'save': 'सहेजें',
     'security': 'सुरक्षा', 'change_password': 'पासवर्ड बदलें', 'current_password': 'मौजूदा पासवर्ड', 'new_password': 'नया पासवर्ड', 'password_rule': 'कम से कम 10 अक्षर, जिसमें अक्षर और अंक दोनों हों', 'password_changed': 'पासवर्ड बदल गया',
     'check_in_again': 'फिर से चेक-इन करें', 'worked_today': 'आज का काम: {t}  ·  {n} बार',
@@ -69,6 +71,7 @@ const moreT = <String, Map<String, String>>{
     'lv_pending': 'बाकी', 'lv_approved': 'मंज़ूर', 'lv_rejected': 'अस्वीकार',
   },
   'gu': {
+    'continue_work': 'કામ ફરી ચાલુ કરો', 'change_request': 'વિનંતી બદલો', 'cancel_request': 'વિનંતી રદ કરો', 'cancel_request_q': 'આ સ્પેર પાર્ટ વિનંતી રદ કરવી? જોબ ફરી ચાલુ થશે.', 'keep_it': 'ના, રહેવા દો', 'yes_cancel': 'હા, રદ કરો', 'request_changed': 'વિનંતી બદલાઈ. ઓફિસને જાણ કરી.', 'request_cancelled': 'વિનંતી રદ થઈ. તમે જોબ ચાલુ રાખી શકો છો.', 'work_resumed': 'કામ ફરી શરૂ થયું. વિનંતી હજી ઓફિસ પાસે છે.', 'my_spare_request': 'મારી સ્પેર પાર્ટ વિનંતી (રાહમાં)', 'spare_open_note': 'તમારી સ્પેર પાર્ટ વિનંતી ઓફિસ પાસે છે. પાર્ટ મળે ત્યાં સુધી તમે બદલી કે રદ કરી શકો છો.', 'spare_update': 'ફેરફાર સાચવો', 'spare_edit_title': 'તમારી સ્પેર પાર્ટ વિનંતી બદલો', 'spare_edit_hint': 'ભૂલી ગયેલા પાર્ટ ઉમેરો, સંખ્યા બદલો કે પાર્ટ કાઢો. ઓફિસને નવી યાદી દેખાશે.',
     'save': 'સાચવો',
     'security': 'સુરક્ષા', 'change_password': 'પાસવર્ડ બદલો', 'current_password': 'હાલનો પાસવર્ડ', 'new_password': 'નવો પાસવર્ડ', 'password_rule': 'ઓછામાં ઓછા 10 અક્ષર, અક્ષર અને અંક બંને સાથે', 'password_changed': 'પાસવર્ડ બદલાયો',
     'check_in_again': 'ફરી ચેક-ઇન કરો', 'worked_today': 'આજનું કામ: {t}  ·  {n} વાર',
@@ -103,6 +106,7 @@ const moreT = <String, Map<String, String>>{
     'lv_pending': 'બાકી', 'lv_approved': 'મંજૂર', 'lv_rejected': 'નામંજૂર',
   },
   'mr': {
+    'continue_work': 'काम पुन्हा सुरू करा', 'change_request': 'विनंती बदला', 'cancel_request': 'विनंती रद्द करा', 'cancel_request_q': 'ही स्पेअर पार्ट विनंती रद्द करायची? जॉब पुन्हा सुरू होईल.', 'keep_it': 'नाही, राहू द्या', 'yes_cancel': 'हो, रद्द करा', 'request_changed': 'विनंती बदलली. ऑफिसला कळवले.', 'request_cancelled': 'विनंती रद्द झाली. तुम्ही जॉब सुरू ठेवू शकता.', 'work_resumed': 'काम पुन्हा सुरू झाले. विनंती अजून ऑफिसकडे आहे.', 'my_spare_request': 'माझी स्पेअर पार्ट विनंती (प्रतीक्षेत)', 'spare_open_note': 'तुमची स्पेअर पार्ट विनंती ऑफिसकडे आहे. पार्ट मिळेपर्यंत तुम्ही बदलू किंवा रद्द करू शकता.', 'spare_update': 'बदल जतन करा', 'spare_edit_title': 'तुमची स्पेअर पार्ट विनंती बदला', 'spare_edit_hint': 'विसरलेले पार्ट जोडा, संख्या बदला किंवा पार्ट काढा. ऑफिसला नवी यादी दिसेल.',
     'save': 'जतन करा',
     'security': 'सुरक्षा', 'change_password': 'पासवर्ड बदला', 'current_password': 'सध्याचा पासवर्ड', 'new_password': 'नवीन पासवर्ड', 'password_rule': 'किमान 10 अक्षरे, अक्षर आणि अंक दोन्ही असावेत', 'password_changed': 'पासवर्ड बदलला',
     'check_in_again': 'पुन्हा चेक-इन करा', 'worked_today': 'आजचे काम: {t}  ·  {n} वेळा',

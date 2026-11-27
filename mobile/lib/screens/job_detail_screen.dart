@@ -80,6 +80,36 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     }
   }
 
+  // ---- an open spare request: change it, cancel it, or carry on working while it waits (needs the network: the office must see it at once) ----
+  Future<void> _spareCall(Future<dynamic> Function() call, String okKey) async {
+    setState(() => _busy = true);
+    try {
+      await call();
+      _msg(tr(okKey));
+    } on ApiException catch (e) {
+      _msg(e.isNetwork ? tr('need_net') : e.message, error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    await _refresh();
+  }
+
+  Future<void> _editSpare(Map<String, dynamic> req) async {
+    final changed = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => SpareRequestScreen(api: widget.api, job: _job, existing: req)));
+    if (changed == true && mounted) await _refresh();
+  }
+
+  Future<void> _cancelSpare(Map<String, dynamic> req) async {
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        content: Text(tr('cancel_request_q')),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('keep_it'))), TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('yes_cancel'), style: const TextStyle(color: AppColors.danger)))],
+      ),
+    );
+    if (yes == true) await _spareCall(() => widget.api.post('/engineers/me/spare-requests/${req['id']}/cancel'), 'request_cancelled');
+  }
+
   Future<void> _decline() async {
     final c = TextEditingController();
     final reason = await showDialog<String>(
@@ -133,7 +163,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     final phase = _job['phase'] as String?;
     final spares = ((_job['spareRequests'] as List?) ?? const []).cast<Map>();
     final lastSpare = spares.isEmpty ? null : Map<String, dynamic>.from(spares.first);
-    final waitingSpares = code == 'on_hold' && lastSpare?['status'] == 'requested';
+    final openSpare = lastSpare?['status'] == 'requested';
+    final waitingSpares = code == 'on_hold' && openSpare;
     final sparesReady = lastSpare?['status'] == 'allocated' && lastSpare?['collectedAt'] == null && (code == 'rescheduled' || code == 'on_hold');
     final travelling = inProgress && phase == 'travelling';
     final working = inProgress && !travelling;
@@ -161,7 +192,14 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         BigButton(label: tr('flag'), icon: Icons.flag_outlined, secondary: true, color: AppColors.textMuted, onPressed: _busy ? null : _decline),
       ]);
     } else if (waitingSpares) {
-      bar = null; // nothing to press: the office is working on it
+      // the job waits for the office, but the engineer stays in charge: carry on, add something he forgot, or withdraw the request
+      bar = ActionBar(children: [
+        BigButton(key: const Key('spare-continue'), label: tr('continue_work'), icon: Icons.play_arrow_rounded, onPressed: _busy ? null : () => _spareCall(() => widget.api.post('/engineers/me/spare-requests/${lastSpare!['id']}/resume'), 'work_resumed')),
+        const SizedBox(height: 10),
+        BigButton(key: const Key('spare-change'), label: tr('change_request'), icon: Icons.edit_outlined, secondary: true, onPressed: _busy ? null : () => _editSpare(lastSpare!)),
+        const SizedBox(height: 10),
+        BigButton(key: const Key('spare-cancel'), label: tr('cancel_request'), icon: Icons.close_rounded, secondary: true, color: AppColors.danger, onPressed: _busy ? null : () => _cancelSpare(lastSpare!)),
+      ]);
     } else if (canStart) {
       bar = ActionBar(children: [BigButton(label: tr('start_job'), icon: Icons.play_arrow_rounded, onPressed: _busy ? null : openJourney)]);
     } else if (travelling) {
@@ -180,11 +218,14 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         ),
         const SizedBox(height: 10),
         BigButton(
-          label: tr('need_spares'),
+          key: openSpare ? const Key('spare-mine') : null,
+          label: tr(openSpare ? 'my_spare_request' : 'need_spares'),
           icon: Icons.build_circle_outlined,
           secondary: true,
           onPressed: _busy
               ? null
+              : openSpare
+              ? () => _editSpare(lastSpare!)
               : () async {
                   final sent = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => SpareRequestScreen(api: widget.api, job: _job)));
                   if (sent == true && mounted) await _refresh();
@@ -204,7 +245,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       else if (travelling) { icon = Icons.local_shipping_outlined; title = tr('on_the_way'); text = null; }
       else if (working) {
         final d = arrivedAt == null ? null : DateTime.now().difference(arrivedAt);
-        icon = Icons.build_outlined; title = tr('working_now'); text = d == null ? null : '${tr('work_time')}: ${d.inHours > 0 ? '${d.inHours} h ' : ''}${d.inMinutes % 60} min'; color = AppColors.info;
+        final worked = d == null ? '' : '${tr('work_time')}: ${d.inHours > 0 ? '${d.inHours} h ' : ''}${d.inMinutes % 60} min';
+        final note = openSpare ? tr('spare_open_note') : '';
+        icon = Icons.build_outlined; title = tr('working_now'); text = [worked, note].where((x) => x.isNotEmpty).join('\n\n'); color = AppColors.info;
       } else { icon = Icons.play_circle_outline; title = tr('start_job'); text = tr('start_hint'); }
       return Container(
         padding: const EdgeInsets.all(16),

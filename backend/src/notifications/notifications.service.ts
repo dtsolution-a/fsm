@@ -21,6 +21,8 @@ const TITLES: Record<string, string> = {
   spare_requested: 'Spare parts needed',
   spare_allocated: 'Spares ready to collect',
   spare_rejected: 'Spares not available',
+  spare_changed: 'Spare request changed',
+  spare_cancelled: 'Spare request cancelled',
   spares_to_return: 'Unused spares to return',
   travel_review: 'Travel needs a look',
   job_reminder: 'Job reminder',
